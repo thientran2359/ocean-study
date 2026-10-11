@@ -16,11 +16,14 @@ export function createClownfish(){
  const material=new T.MeshStandardMaterial({vertexColors:true,roughness:.9,metalness:0,side:T.DoubleSide});
  const body=new T.SkinnedMesh(geo,material);body.add(bones[0]);body.bind(new T.Skeleton(bones));fish.add(body);
  function sphere(parent,xyz,scale,color){const m=new T.Mesh(new T.SphereGeometry(1,24,16),new T.MeshStandardMaterial({color,roughness:.68}));m.position.set(...xyz);m.scale.set(...scale);parent.add(m);return m;}
+ const eyes=[],gills=[];
  const head=new T.Group();head.position.x=1;bones[0].add(head);
- for(const sign of [-1,1]){sphere(head,[-.79,.085,sign*.136],[.058,.06,.019],'#bf7720');sphere(head,[-.797,.087,sign*.153],[.039,.044,.016],'#0a1115');sphere(head,[-.809,.103,sign*.166],[.008,.009,.004],'#d9e5da');
-  const g=[];for(let i=0;i<=24;i++){let t=-1.05+i/24*2.1;g.push(new T.Vector3(-.51+.037*Math.cos(t),.2*Math.sin(t),sign*(.15+.026*Math.cos(t))));}const line=new T.Line(new T.BufferGeometry().setFromPoints(g),new T.LineBasicMaterial({color:'#733c19',transparent:true,opacity:.65}));head.add(line);
+ for(const sign of [-1,1]){sphere(head,[-.79,.085,sign*.136],[.058,.06,.019],'#bf7720');const gaze=new T.Group();gaze.position.set(-.797,.087,sign*.153);head.add(gaze);sphere(gaze,[0,0,0],[.039,.044,.016],'#0a1115');sphere(gaze,[-.012,.016,sign*.013],[.008,.009,.004],'#d9e5da');eyes.push(gaze);
+  const g=[];for(let i=0;i<=24;i++){let t=-1.05+i/24*2.1;g.push(new T.Vector3(-.51+.037*Math.cos(t),.2*Math.sin(t),sign*(.15+.026*Math.cos(t))));}const line=new T.Line(new T.BufferGeometry().setFromPoints(g),new T.LineBasicMaterial({color:'#733c19',transparent:true,opacity:.65}));head.add(line);gills.push({line,sign});
+  const flap=sphere(head,[-.51,-.005,sign*.17],[.07,.185,.013],'#dc801e');gills.push({flap,sign});
  }
  const mouth=new T.Mesh(new T.TorusGeometry(.028,.007,8,24),new T.MeshStandardMaterial({color:'#865020',roughness:.9}));mouth.rotation.y=Math.PI/2;mouth.position.set(-1.008,-.006,0);mouth.scale.set(1,.66,1);head.add(mouth);
+ const cavity=sphere(head,[-1.008,-.006,0],[.009,.019,.021],'#21130d');
  // Fin fans include darker margins and radial rays, attached to separate pivots.
  function fin(parent,xyz,outline,rotation=[0,0,0]){const pivot=new T.Group();pivot.position.set(...xyz);pivot.rotation.set(...rotation);parent.add(pivot);const verts=[0,0,0],colors=[orange.r,orange.g,orange.b],ids=[];
   for(let ring=0;ring<2;ring++){const f=ring===0?.86:1;outline.forEach(([x,y])=>{verts.push(x*f,y*f,0);const c=ring===0?orange:black;colors.push(c.r,c.g,c.b);});}
@@ -32,7 +35,7 @@ export function createClownfish(){
  const dorsal=fin(bones[2],[0,.24,0],[[-.44,.0],[-.39,.1],[-.32,.12],[-.25,.18],[-.17,.19],[-.1,.15],[0,.21],[.12,.19],[.25,.12],[.39,-.10]]);
  const anal=fin(bones[3],[0,-.19,0],[[-.22,0],[-.09,-.16],[.04,-.17],[.19,-.13],[.31,.07]]);
  const pectorals=[];for(const sign of [-1,1]){const f=fin(bones[1],[.02,-.06,sign*.165],[[0,.03],[.09,.04],[.19,0],[.23,-.07],[.21,-.16],[.15,-.2],[.07,-.17],[0,-.035]],[0,sign*.7,0]);pectorals.push(f);}
- function animate(t,effort=1,turn=0){for(let i=1;i<bones.length;i++){const strength=[0,.015,.038,.075,.13,.2][i];bones[i].rotation.y=Math.sin(t*6-i*.7)*strength*effort+turn*strength*.7;bones[i].rotation.z=Math.sin(t*2-i*.6)*.008;}
- tail.rotation.y=Math.sin(t*6-4.4)*.2*effort;dorsal.rotation.x=Math.sin(t*4)*.035;anal.rotation.x=Math.sin(t*4+1)*.045;pectorals.forEach((f,i)=>{const sign=i?1:-1;f.rotation.y=sign*(.65+Math.sin(t*9+i*.6)*.3);f.rotation.x=Math.sin(t*9+i*.6)*.12;});mouth.scale.y=.66+Math.sin(t*2.6)*.045;}
- return {group:fish,animate,body,bones};
+ function animate(t,effort=1,turn=0,life={}){for(let i=1;i<bones.length;i++){const strength=[0,.015,.038,.075,.13,.2][i];bones[i].rotation.y=Math.sin(t*6-i*.7)*strength*effort+turn*strength*.7;bones[i].rotation.z=Math.sin(t*2-i*.6)*.008;}
+ tail.rotation.y=Math.sin(t*6-4.4)*.2*effort;dorsal.rotation.x=Math.sin(t*4)*.035;anal.rotation.x=Math.sin(t*4+1)*.045;pectorals.forEach((f,i)=>{const sign=i?1:-1;f.rotation.y=sign*(.65+Math.sin(t*9+i*.6)*.3);f.rotation.x=Math.sin(t*9+i*.6)*.12;});const breath=.5+.5*Math.sin((life.breathTime??t)*(2.3+Math.min(effort,1)*1.1));mouth.scale.y=.5+breath*.7;cavity.scale.y=.013+breath*.02;mouth.position.x=-1.008-breath*.006;gills.forEach(g=>{if(g.flap){g.flap.position.z=g.sign*(.17+breath*.012);g.flap.rotation.y=g.sign*breath*.07;}else g.line.position.z=g.sign*breath*.012;});const gx=T.MathUtils.clamp(life.gazeX??0,-1,1),gy=T.MathUtils.clamp(life.gazeY??0,-1,1);eyes.forEach(e=>{e.position.x=-.797+gx*.011;e.position.y=.087+gy*.009;});pectorals.forEach((f,i)=>{f.rotation.y+=(i?1:-1)*(life.brake??0)*.25+turn*(i?.12:-.12);});}
+ return {group:fish,animate,body,bones,eyes,gills,mouth};
 }

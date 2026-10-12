@@ -1,6 +1,7 @@
 import * as T from './assets/three.js';
 import {createClownfish} from './nemo-model.js';
 import {NemoLife} from './nemo-life.js';
+import {NemoSteering} from './nemo-steering.js';
 const canvas=document.querySelector('#fish'),stage=document.querySelector('#stage');
 const reduce=matchMedia('(prefers-reduced-motion: reduce)');let paused=reduce.matches,mode='auto',speed=1,clock=0,modeStart=0;
 const descriptions={auto:'Quan sát, khám phá, gặp bạn cá và nghỉ bên hải quỳ. Đưa chuột gần để Nemo chú ý.',hover:'Vây ngực giữ thăng bằng. Đuôi quẫy nhẹ, thân trôi theo nước.',cruise:'Quẫy đuôi, tăng tốc rồi lướt. Cá nghiêng thân theo đường bơi.',turn:'Đầu dẫn hướng, thân uốn theo rồi đuôi hoàn tất vòng quay.'};
@@ -21,7 +22,7 @@ try{
  function greet(){if(paused)return;if(mode!=='auto'){document.querySelector('[data-mode="auto"]').click();}life.touch();}
  document.querySelector('#greet').onclick=greet;
  function track(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);if(!ray.ray.intersectPlane(plane,point))return;const now=performance.now();const dt=Math.max(.016,(now-pointer.stamp)/1000);pointer.speed=pointer.active?Math.min(12,Math.hypot(point.x-pointer.x,point.y-pointer.y)/dt):0;pointer.x=point.x;pointer.y=point.y;pointer.stamp=now;pointer.active=true;}
-const targetQuaternion=new T.Quaternion(),targetPosition=new T.Vector3();
+const steering=new NemoSteering(),targetPosition=new T.Vector3();let holding=false;
  let azimuth=.2,elevation=.13,distance=5.5,drag=null;
  function reset(){azimuth=.2;elevation=.13;distance=innerWidth<600?6.5:5.5;}reset();document.querySelector('#reset').onclick=reset;
  canvas.addEventListener('pointerdown',e=>{track(e);drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};canvas.setPointerCapture(e.pointerId);});
@@ -33,20 +34,29 @@ const targetQuaternion=new T.Quaternion(),targetPosition=new T.Vector3();
  let previous=performance.now(),phase=0;
  function render(now){requestAnimationFrame(render);const dt=Math.min((now-previous)/1000,.05);previous=now;if(document.hidden)return;
   reef.visible=companion.group.visible=mode==='auto';
-  if(!paused){clock+=dt*speed;const t=clock-modeStart;let yaw=.18,roll=0,effort=.42,brake=0;let look=null;reef.visible=companion.group.visible=mode==='auto';targetPosition.set(0,Math.sin(clock*.85)*.045,0);
+  if(!paused){clock+=dt*speed;const t=clock-modeStart;let yaw=.18,roll=0,effort=.42,brake=0;let look=null,greeting=false;reef.visible=companion.group.visible=mode==='auto';targetPosition.set(0,Math.sin(clock*.85)*.045,0);
    if(mode==='auto'){
     pointer.distance=Math.hypot(pointer.x-model.group.position.x,pointer.y-model.group.position.y);if(now-pointer.stamp>150)pointer.speed=0;
     const result=life.tick(dt*speed,{pointer:pointer.active&&!drag?pointer:null,x:model.group.position.x,y:model.group.position.y});targetPosition.set(...result.goal);effort=result.effort;brake=result.brake;look=result.look;
     const dx=targetPosition.x-model.group.position.x,dz=targetPosition.z-model.group.position.z;
-    yaw=result.greet?Math.PI/2:Math.abs(dx)+Math.abs(dz)>.06?Math.atan2(dz,-dx):.2+Math.sin(clock*.3)*.22;
+    const gap=Math.hypot(dx,dz);holding=holding?gap<.2:gap<.085;greeting=result.greet;
+    yaw=greeting?Math.PI/2:!holding?Math.atan2(dz,-dx):steering.yaw;
     if(result.state==='curious')yaw+=T.MathUtils.clamp((pointer.x-model.group.position.x)*.15,-.2,.2);
     companion.group.position.set(-1.33+Math.sin(clock*.48)*.12,-.32+Math.sin(clock*.7)*.055,.34);companion.group.rotation.y=Math.PI+.18+Math.sin(clock*.35)*.17;companion.animate(phase+2.3,.32,.1,{breathTime:clock+2,gazeX:.3});
     setReaction(reactions[result.state]);
    }else setReaction(descriptions[mode]);
    if(mode==='hover'){yaw=.18+Math.sin(clock*.32)*.12;roll=Math.sin(clock*.75)*.025;}
    if(mode==='cruise'){const a=t*.42;targetPosition.set(Math.sin(a)*1.05,Math.sin(a*1.6)*.12,Math.cos(a)*.35);const vx=Math.cos(a)*1.05*.42,vz=-Math.sin(a)*.35*.42;yaw=Math.atan2(vz,-vx);roll=Math.sin(a)*.06;effort=.62+.32*(.5+.5*Math.sin(clock*1.5));}
-   if(mode==='turn'){const a=t*.55;yaw=.18+Math.PI*(1-Math.cos(a));targetPosition.set(Math.sin(a)*.3,Math.sin(a*1.4)*.09,Math.sin(a)*.15);roll=Math.sin(a)*.11;effort=.65+.2*Math.abs(Math.sin(a));}
-   targetQuaternion.setFromEuler(new T.Euler(0,yaw,roll,'YXZ'));model.group.quaternion.slerp(targetQuaternion,1-Math.exp(-dt*2.8));model.group.position.lerp(targetPosition,1-Math.exp(-dt*2));phase+=dt*speed*(.65+effort*.7);const localLook=look?model.group.worldToLocal(new T.Vector3(look[0],look[1],.35)):new T.Vector3();gazeX+=(T.MathUtils.clamp(localLook.x,-1,1)-gazeX)*(1-Math.exp(-dt*3));gazeY+=(T.MathUtils.clamp(localLook.y,-1,1)-gazeY)*(1-Math.exp(-dt*3));model.animate(phase,effort,mode==='turn'?Math.sin(t*.55):0,{breathTime:clock,gazeX,gazeY,brake});const size=mode==='auto'?.65:1;model.group.scale.lerp(new T.Vector3(size,size,size),1-Math.exp(-dt*3));
+   if(mode==='turn'){const a=t*.42;targetPosition.set(-Math.sin(a)*.85,Math.sin(a*.7)*.04,(1-Math.cos(a))*.48-.35);yaw=Math.atan2(Math.sin(a)*.48,Math.cos(a)*.85);effort=.55;}
+   if(mode==='turn'||mode==='cruise'){const dx=targetPosition.x-model.group.position.x,dz=targetPosition.z-model.group.position.z;if(Math.hypot(dx,dz)>.08)yaw=Math.atan2(dz,-dx);else yaw=steering.yaw;}
+   const step=dt*speed,gap=targetPosition.distanceTo(model.group.position);
+   const motion=steering.tick(step,yaw,gap,{travel:mode!=='hover'&&!greeting&&!(mode==='auto'&&holding),effort});
+   model.group.rotation.set(0,motion.yaw,roll+motion.bank,'YXZ');
+   model.group.position.x-=Math.cos(motion.yaw)*motion.speed*step;
+   model.group.position.z+=Math.sin(motion.yaw)*motion.speed*step;
+   model.group.position.y+=(targetPosition.y-model.group.position.y)*(1-Math.exp(-step*1.6));
+   brake=Math.max(brake,Math.abs(motion.bend)*.65);effort*=1-Math.abs(motion.bend)*.25;
+   phase+=step*(.65+effort*.7);const localLook=look?model.group.worldToLocal(new T.Vector3(look[0],look[1],.35)):new T.Vector3();gazeX+=(T.MathUtils.clamp(localLook.x,-1,1)-gazeX)*(1-Math.exp(-dt*3));gazeY+=(T.MathUtils.clamp(localLook.y,-1,1)-gazeY)*(1-Math.exp(-dt*3));model.animate(phase,effort,motion.bend,{breathTime:clock,gazeX,gazeY,brake,delta:step});const size=mode==='auto'?.65:1;model.group.scale.lerp(new T.Vector3(size,size,size),1-Math.exp(-dt*3));
   }
   camera.position.set(Math.sin(azimuth)*Math.cos(elevation)*distance,Math.sin(elevation)*distance,Math.cos(azimuth)*Math.cos(elevation)*distance);camera.lookAt(0,0,0);renderer.render(scene,camera);
  }model.group.scale.setScalar(.65);companion.group.position.set(-1.33,-.32,.34);model.animate(0,.4,0);requestAnimationFrame(render);

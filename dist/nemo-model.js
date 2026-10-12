@@ -1,49 +1,46 @@
 import * as T from './assets/three.js';
-import {paintedMaterial} from './nemo-paint.js';
-// Geometry is authored in model coordinates: head at -X, dorsal at +Y.
-export function createClownfish(){
+import {illustrationMaterial} from './nemo-textures.js';
+// Closed torso with a painted UV map; head -X, back +Y, independent fin pivots.
+export function createClownfish(textures={}){
  const fish=new T.Group(),bones=[],lengths=[0,.55,.4,.35,.3,.25];
- lengths.forEach((length,i)=>{const bone=new T.Bone();bone.position.x=i?length:-1;bones.push(bone);if(i)bones[i-1].add(bone);});
- const profile=[[-1,.035,.045],[-.91,.14,.105],[-.76,.255,.155],[-.5,.32,.18],[-.18,.32,.17],[.15,.275,.135],[.43,.19,.095],[.65,.1,.065],[.85,.075,.045]];
- function radii(x){let i=0;while(i<profile.length-2&&x>profile[i+1][0])i++;const a=profile[i],b=profile[i+1],t=(x-a[0])/(b[0]-a[0]),before=profile[Math.max(0,i-1)],after=profile[Math.min(profile.length-1,i+2)];return [1,2].map(k=>{const m0=(b[k]-before[k])/(b[0]-before[0])*(b[0]-a[0]),m1=(after[k]-a[k])/(after[0]-a[0])*(b[0]-a[0]);return Math.max(.025,(2*t*t*t-3*t*t+1)*a[k]+(t*t*t-2*t*t+t)*m0+(-2*t*t*t+3*t*t)*b[k]+(t*t*t-t*t)*m1);});}
- const pos=[],col=[],indices=[],skinI=[],skinW=[],uv=[],joints=[-1,-.45,-.05,.3,.6,.85],N=100,M=56;
- const orange=new T.Color('#ef851c'),white=new T.Color('#f4ecda'),black=new T.Color('#242a2b');
- for(let i=0;i<=N;i++){const x=-1+i/N*1.85,[ry,rz]=radii(x);for(let j=0;j<=M;j++){const theta=j/M*Math.PI*2,y=Math.cos(theta)*ry,z=Math.sin(theta)*rz;pos.push(x,y,z);uv.push(i/N,j/M);
-  const warp=.022*Math.sin(theta*2)+.011*Math.sin(theta*5+x*6);let d=Math.min(Math.abs(x+.66+warp)/.073,Math.abs(x+.02+warp*1.8)/.09,Math.abs(x-.65+warp*.4)/.048);let c=white.clone().lerp(black,T.MathUtils.smoothstep(d,.96,1.06)).lerp(orange,T.MathUtils.smoothstep(d,1.24,1.36));const brush=Math.sin(x*148+Math.sin(theta*19)*2)*Math.sin(theta*57+x*11)*.032;const shade=.91+.09*Math.cos(theta)+brush;c.multiplyScalar(shade);col.push(c.r,c.g,c.b);
-  let k=0;while(k<4&&x>joints[k+1])k++;const f=T.MathUtils.clamp((x-joints[k])/(joints[k+1]-joints[k]),0,1);skinI.push(k,k+1,0,0);skinW.push(1-f,f,0,0);
-  if(i<N&&j<M){let a=i*(M+1)+j,b=a+M+1;indices.push(a,b,a+1,b,b+1,a+1);}
+ lengths.forEach((length,i)=>{const b=new T.Bone();b.position.x=i?length:-1;bones.push(b);if(i)bones[i-1].add(b);});
+ const profile=[[-1.035,0,0],[-1,.10,.065],[-.91,.24,.13],[-.76,.35,.19],[-.5,.43,.235],[-.18,.435,.225],[.15,.39,.19],[.43,.29,.13],[.65,.17,.085],[.85,.12,.06],[.91,0,0]];
+ function radii(x){let i=0;while(i<profile.length-2&&x>profile[i+1][0])i++;const a=profile[i],b=profile[i+1],t=(x-a[0])/(b[0]-a[0]),p=profile[Math.max(0,i-1)],q=profile[Math.min(profile.length-1,i+2)];return [1,2].map(k=>{const m=(b[k]-p[k])/(b[0]-p[0])*(b[0]-a[0]),n=(q[k]-a[k])/(q[0]-a[0])*(b[0]-a[0]);return Math.max(0,(2*t**3-3*t*t+1)*a[k]+(t**3-2*t*t+t)*m+(-2*t**3+3*t*t)*b[k]+(t**3-t*t)*n);});}
+ const pos=[],uv=[],ids=[],si=[],sw=[],joints=[-1,-.45,-.05,.3,.6,.85],N=120,M=64;
+ for(let i=0;i<=N;i++){const x=-1.035+i/N*1.945,[ry,rz]=radii(x);for(let j=0;j<=M;j++){const a=j/M*Math.PI*2,y=Math.cos(a)*ry,z=Math.sin(a)*rz;pos.push(x,y,z);
+  // Mirror the side paint around the back/belly, making a continuous circumference.
+  uv.push(T.MathUtils.clamp((x+1.035)/1.945,0,1),.08+.84*(1-Math.cos(a))/2);
+  let k=0;while(k<4&&x>joints[k+1])k++;const f=T.MathUtils.clamp((x-joints[k])/(joints[k+1]-joints[k]),0,1);si.push(k,k+1,0,0);sw.push(1-f,f,0,0);
+  if(i<N&&j<M){const a=i*(M+1)+j,b=a+M+1;ids.push(a,b,a+1,b,b+1,a+1);}
  }}
- const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('color',new T.Float32BufferAttribute(col,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(skinI,4));geo.setAttribute('skinWeight',new T.Float32BufferAttribute(skinW,4));geo.setIndex(indices);geo.computeVertexNormals();
- const material=paintedMaterial({vertexColors:true,side:T.DoubleSide});
- const body=new T.SkinnedMesh(geo,material);body.add(bones[0]);body.bind(new T.Skeleton(bones));fish.add(body);
- function sphere(parent,xyz,scale,color){const m=new T.Mesh(new T.SphereGeometry(1,24,16),new T.MeshStandardMaterial({color,roughness:.88}));m.position.set(...xyz);m.scale.set(...scale);parent.add(m);return m;}
- const eyes=[],gills=[];
- const head=new T.Group();head.position.x=1;bones[0].add(head);
- for(const sign of [-1,1]){sphere(head,[-.79,.085,sign*.136],[.058,.06,.019],'#bf7720');const gaze=new T.Group();gaze.position.set(-.797,.087,sign*.153);head.add(gaze);sphere(gaze,[0,0,0],[.039,.044,.016],'#0a1115');sphere(gaze,[-.012,.016,sign*.013],[.008,.009,.004],'#d9e5da');eyes.push(gaze);
-  const g=[];for(let i=0;i<=24;i++){let t=-1.05+i/24*2.1;g.push(new T.Vector3(-.51+.037*Math.cos(t),.2*Math.sin(t),sign*(.15+.026*Math.cos(t))));}const line=new T.Line(new T.BufferGeometry().setFromPoints(g),new T.LineBasicMaterial({color:'#733c19',transparent:true,opacity:.65}));head.add(line);gills.push({line,sign});
-  const flap=sphere(head,[-.51,-.005,sign*.17],[.065,.17,.008],'#df7e20');gills.push({flap,sign});
+ const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4));geo.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));geo.setIndex(ids);geo.computeVertexNormals();
+ const body=new T.SkinnedMesh(geo,illustrationMaterial(textures.body,{side:T.DoubleSide}));body.add(bones[0]);body.bind(new T.Skeleton(bones));fish.add(body);
+ const head=new T.Group();head.position.x=1;bones[0].add(head);const eyes=[],gills=[];
+ // Project the approved illustration's eye onto a small convex eye surface.
+ for(const sign of [-1,1]){const eye=new T.Group();eye.position.set(-.79,.16,sign*.175);head.add(eye);eyes.push(eye);const p=[],u=[],ix=[],R=10,A=48;
+  for(let r=0;r<=R;r++)for(let j=0;j<=A;j++){const f=r/R,a=j/A*Math.PI*2,c=Math.cos(a),s=Math.sin(a);p.push(c*f*.077,s*f*.078,sign*.024*Math.sqrt(1-f*f));u.push((207+c*f*53)/1536,1-(455-s*f*54)/1024);if(r<R&&j<A){let k=r*(A+1)+j,n=k+A+1;ix.push(k,n,k+1,n,n+1,k+1);}}
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(p,3));g.setAttribute('uv',new T.Float32BufferAttribute(u,2));g.setIndex(ix);g.computeVertexNormals();eye.add(new T.Mesh(g,illustrationMaterial(textures.details,{side:T.DoubleSide})));
+  const pts=[];for(let j=0;j<=30;j++){const a=-1+j/30*2;pts.push(new T.Vector3(-.47+.035*Math.cos(a),.27*Math.sin(a),sign*.215));}const line=new T.Line(new T.BufferGeometry().setFromPoints(pts),new T.LineBasicMaterial({color:'#975017',transparent:true,opacity:.3}));head.add(line);gills.push({line,sign});
  }
- const mouth=new T.Mesh(new T.TorusGeometry(.024,.004,8,24),new T.MeshStandardMaterial({color:'#865020',roughness:.9}));mouth.rotation.y=Math.PI/2;mouth.position.set(-1.008,-.006,0);mouth.scale.set(1,.66,1);head.add(mouth);
- const cavity=sphere(head,[-1.008,-.006,0],[.009,.019,.021],'#21130d');
- // Fin fans include darker margins and radial rays, attached to separate pivots.
- function fin(parent,xyz,outline,rotation=[0,0,0]){
-  const pivot=new T.Group();pivot.position.set(...xyz);pivot.rotation.set(...rotation);parent.add(pivot);
-  const curve=new T.CatmullRomCurve3(outline.map(([x,y])=>new T.Vector3(x,y,0)),false,'centripetal');
-  const edge=curve.getPoints(56),n=edge.length,rings=10,verts=[0,0,0],colors=[orange.r,orange.g,orange.b],uvs=[0,.5],ids=[];
-  for(let r=1;r<=rings;r++){const f=r/rings;edge.forEach((p,j)=>{const bow=Math.sin(j/(n-1)*Math.PI)*Math.sin(f*Math.PI)*.025;verts.push(p.x*f,p.y*f,bow);uvs.push(f,j/(n-1));const c=orange.clone().lerp(black,T.MathUtils.smoothstep(f,.83,.95));c.multiplyScalar(.94+.06*Math.sin(j*2.8+f*3));colors.push(c.r,c.g,c.b);});}
-  for(let j=0;j<n-1;j++)ids.push(0,1+j,2+j);
-  for(let r=0;r<rings-1;r++)for(let j=0;j<n-1;j++){const a=1+r*n+j,b=a+n;ids.push(a,b,a+1,b,b+1,a+1);}
-  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(verts,3));g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));g.setIndex(ids);g.computeVertexNormals();
-  pivot.add(new T.Mesh(g,paintedMaterial({vertexColors:true,side:T.DoubleSide,transparent:true,opacity:.88,depthWrite:false})));
-  const rays=[];for(let j=1;j<n-1;j+=3){const p=edge[j];for(let k=1;k<8;k++){for(const f of [k/9,(k+1)/9])rays.push(p.x*f,p.y*f,Math.sin(j/(n-1)*Math.PI)*Math.sin(f*Math.PI)*.025+.002);}}
-  pivot.add(new T.LineSegments(new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(rays,3)),new T.LineBasicMaterial({color:'#ffd18a',transparent:true,opacity:.28})));return pivot;
+ function sphere(parent,xyz,scale,color){const m=new T.Mesh(new T.SphereGeometry(1,24,16),new T.MeshStandardMaterial({color,roughness:1}));m.position.set(...xyz);m.scale.set(...scale);parent.add(m);return m;}
+ const mouth=new T.Group();mouth.position.set(-1.035,-.013,0);head.add(mouth);
+ sphere(mouth,[-.008,.015,0],[.028,.011,.047],'#f5a22e');sphere(mouth,[-.005,-.015,0],[.024,.009,.041],'#e68c22');
+ const cavity=sphere(head,[-1.038,-.013,0],[.01,.015,.032],'#58320d');
+ // One painted tail fan from the approved source supplies real brush strokes and rays.
+ const sourceCurve=new T.CatmullRomCurve3([[1320,390],[1410,376],[1481,439],[1500,551],[1480,674],[1435,748],[1330,733]].map(([x,y])=>new T.Vector3(x,y,0)),false,'centripetal');
+ function fin(parent,xyz,outline,rotation=[0,0,0]){const pivot=new T.Group();pivot.position.set(...xyz);pivot.rotation.set(...rotation);parent.add(pivot);const edge=new T.CatmullRomCurve3(outline.map(([x,y])=>new T.Vector3(x,y,0)),false,'centripetal').getPoints(64),n=edge.length,rings=14,p=[0,0,0],u=[1190/1536,1-550/1024],ix=[];
+  for(let r=1;r<=rings;r++)for(let j=0;j<n;j++){const f=r/rings,q=edge[j],tex=sourceCurve.getPoint(j/(n-1));p.push(q.x*f,q.y*f,Math.sin(f*Math.PI)*Math.sin(j/(n-1)*Math.PI)*.024);u.push((1190+(tex.x-1190)*f)/1536,1-(550+(tex.y-550)*f)/1024);}
+  for(let j=0;j<n-1;j++)ix.push(0,j+1,j+2);for(let r=0;r<rings-1;r++)for(let j=0;j<n-1;j++){const a=1+r*n+j,b=a+n;ix.push(a,b,a+1,b,b+1,a+1);}
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(p,3));g.setAttribute('uv',new T.Float32BufferAttribute(u,2));g.setIndex(ix);g.computeVertexNormals();pivot.add(new T.Mesh(g,illustrationMaterial(textures.details,{side:T.DoubleSide,transparent:true,opacity:.96,alphaTest:.4,depthWrite:true})));return pivot;
  }
- const tailOutline=[];for(let i=0;i<=22;i++){let a=-1.05+i/22*2.1;tailOutline.push([.39*Math.cos(a),.29*Math.sin(a)]);}const tail=fin(bones[5],[0,0,0],tailOutline);
- const dorsal=fin(bones[2],[0,.24,0],[[-.44,.0],[-.39,.1],[-.32,.12],[-.25,.18],[-.17,.19],[-.1,.15],[0,.21],[.12,.19],[.25,.12],[.39,-.10]]);
- const anal=fin(bones[3],[0,-.19,0],[[-.22,0],[-.09,-.16],[.04,-.17],[.19,-.13],[.31,.07]]);
- const pectorals=[];for(const sign of [-1,1]){const f=fin(bones[1],[.02,-.06,sign*.165],[[0,.03],[.09,.04],[.19,0],[.23,-.07],[.21,-.16],[.15,-.2],[.07,-.17],[0,-.035]],[0,sign*.7,0]);pectorals.push(f);}
+ const tail=fin(bones[5],[0,0,0],[[.12,.16],[.32,.29],[.51,.34],[.6,.19],[.62,0],[.59,-.22],[.46,-.34],[.25,-.28],[.1,-.14]]);
+ const dorsal=fin(bones[1],[.16,.36,0],[[-.28,.01],[-.2,.2],[-.05,.31],[.13,.34],[.3,.29],[.4,.18],[.41,.02]]);
+ const rearDorsal=fin(bones[3],[.08,.26,0],[[-.24,.01],[-.16,.19],[.02,.28],[.17,.21],[.26,.09],[.24,-.03]]);
+ const anal=fin(bones[3],[0,-.27,0],[[-.18,.01],[-.17,-.19],[-.01,-.29],[.17,-.27],[.29,-.14],[.28,.02]]);
+ fin(bones[1],[.17,-.37,0],[[-.06,.02],[.03,-.2],[.19,-.24],[.25,-.12],[.24,.02]]);
+ const pectorals=[];for(const sign of [-1,1])pectorals.push(fin(bones[1],[.04,-.025,sign*.235],[[.02,.07],[.18,.17],[.34,.11],[.43,-.04],[.43,-.23],[.31,-.33],[.17,-.3],[.02,-.09]],[0,-sign*.7,0]));
  const turnLag=new Float64Array(6);
  function animate(t,effort=1,turn=0,life={}){for(let i=1;i<bones.length;i++){const strength=[0,.015,.038,.075,.13,.2][i];turnLag[i]+=((i===1?turn:turnLag[i-1])-turnLag[i])*(1-Math.exp(-(life.delta??1/60)*12));bones[i].rotation.y=Math.sin(t*6-i*.7)*strength*effort-turnLag[i]*[0,.06,.1,.14,.17,.19][i];bones[i].rotation.z=Math.sin(t*2-i*.6)*.008;}
- tail.rotation.y=Math.sin(t*6-4.4)*.2*effort-turnLag[5]*.12;dorsal.rotation.x=Math.sin(t*4)*.035;anal.rotation.x=Math.sin(t*4+1)*.045;pectorals.forEach((f,i)=>{const sign=i?1:-1;f.rotation.y=sign*(.65+Math.sin(t*9+i*.6)*.3);f.rotation.x=Math.sin(t*9+i*.6)*.12;});const breath=.5+.5*Math.sin((life.breathTime??t)*(2.3+Math.min(effort,1)*1.1));mouth.scale.y=.5+breath*.7;cavity.scale.y=.013+breath*.02;mouth.position.x=-1.008-breath*.006;gills.forEach(g=>{if(g.flap){g.flap.position.z=g.sign*(.17+breath*.012);g.flap.rotation.y=g.sign*breath*.07;}else g.line.position.z=g.sign*breath*.012;});const gx=T.MathUtils.clamp(life.gazeX??0,-1,1),gy=T.MathUtils.clamp(life.gazeY??0,-1,1);eyes.forEach(e=>{e.position.x=-.797+gx*.011;e.position.y=.087+gy*.009;});pectorals.forEach((f,i)=>{f.rotation.y+=(i?1:-1)*(life.brake??0)*.25+turn*(i?.12:-.12);});}
+ tail.rotation.y=Math.sin(t*6-4.4)*.2*effort-turnLag[5]*.12;rearDorsal.rotation.x=Math.sin(t*4+.3)*.03;dorsal.rotation.x=Math.sin(t*4)*.035;anal.rotation.x=Math.sin(t*4+1)*.045;pectorals.forEach((f,i)=>{const sign=i?1:-1;f.rotation.y=-sign*(.65+Math.sin(t*9+i*.6)*.3);f.rotation.x=Math.sin(t*9+i*.6)*.12;});const breath=.5+.5*Math.sin((life.breathTime??t)*(2.3+Math.min(effort,1)*1.1));mouth.scale.y=.5+breath*.7;cavity.scale.y=.013+breath*.02;mouth.position.x=-1.035-breath*.006;gills.forEach(g=>{if(g.flap){g.flap.position.z=g.sign*(.215+breath*.006);g.flap.rotation.y=g.sign*breath*.07;}else g.line.position.z=g.sign*breath*.012;});const gx=T.MathUtils.clamp(life.gazeX??0,-1,1),gy=T.MathUtils.clamp(life.gazeY??0,-1,1);eyes.forEach(e=>{e.position.x=-.79+gx*.008;e.position.y=.16+gy*.008;});pectorals.forEach((f,i)=>{f.rotation.y-=(i?1:-1)*(life.brake??0)*.25+turn*(i?.12:-.12);});}
  return {group:fish,animate,body,bones,eyes,gills,mouth};
 }

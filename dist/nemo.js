@@ -10,9 +10,9 @@ const pause=document.querySelector('#pause');function updatePause(){pause.textCo
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;modeStart=clock;document.querySelectorAll('[data-mode]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));document.querySelector('#behavior').textContent=descriptions[mode];});
 document.querySelector('#speed').oninput=e=>{speed=Number(e.target.value);document.querySelector('#speed-value').textContent=speed.toFixed(2)+'×';};
 try{
- const renderer=new T.WebGLRenderer({canvas,alpha:true,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
+ const renderer=new T.WebGLRenderer({canvas,alpha:true,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
  const scene=new T.Scene(),camera=new T.PerspectiveCamera(35,1,.1,100);
- scene.add(new T.HemisphereLight('#d4eaff','#183446',2));const sun=new T.DirectionalLight('#ffdfb7',3);sun.position.set(-3,5,5);scene.add(sun);const rim=new T.DirectionalLight('#7eb2d3',1.5);rim.position.set(2,1,-4);scene.add(rim);
+ scene.add(new T.HemisphereLight('#e6edf1','#314452',2.2));const sun=new T.DirectionalLight('#ffe5c9',1.65);sun.position.set(-3,5,5);scene.add(sun);const rim=new T.DirectionalLight('#91b8ca',.65);rim.position.set(2,1,-4);scene.add(rim);
  const model=createClownfish();scene.add(model.group);
  const life=new NemoLife(),companion=createClownfish();companion.group.scale.setScalar(.32);scene.add(companion.group);
  const texture=await new T.TextureLoader().loadAsync('assets/anemone.png');texture.colorSpace=T.SRGBColorSpace;

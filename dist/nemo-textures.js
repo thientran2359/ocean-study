@@ -8,5 +8,5 @@ export async function loadNemoTextures(){
 export function illustrationMaterial(map,options={}){
  // The illustration supplies pigment and soft shading. A small diffuse contribution
  // gives volume during turns without washing out the approved painted colors.
- return new T.MeshStandardMaterial({map:map??null,roughness:1,metalness:0,emissive:'#ffffff',emissiveMap:map??null,emissiveIntensity:.65,...options});
+ return new T.MeshStandardMaterial({map:map??null,roughness:1,metalness:0,toneMapped:false,emissive:'#ffffff',emissiveMap:map??null,emissiveIntensity:.22,...options});
 }
